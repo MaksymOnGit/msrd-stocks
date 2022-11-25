@@ -62,7 +62,7 @@ def register_startup_event(
     @app.on_event("startup")
     async def _startup() -> None:  # noqa: WPS430
         await _setup_db(app)
-        await init_kafka(app)
+        # await init_kafka(app)
         pass  # noqa: WPS420
 
     return _startup
@@ -82,7 +82,7 @@ def register_shutdown_event(
     async def _shutdown() -> None:  # noqa: WPS430
         await app.state.db_engine.dispose()
 
-        await shutdown_kafka(app)
+        # await shutdown_kafka(app)
         pass  # noqa: WPS420
 
     return _shutdown
