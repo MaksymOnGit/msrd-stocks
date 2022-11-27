@@ -1,4 +1,5 @@
 import json
+from typing import Union
 
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
@@ -12,7 +13,7 @@ class DocumentItem(BaseModel):
     quantity: float
     price: float
     product_name: str
-    quantitative_unit: str
+    quantitative_unit: Union[str, None]
 
     class Config:
         alias_generator = to_lower_camel
