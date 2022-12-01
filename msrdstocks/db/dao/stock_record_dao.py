@@ -4,7 +4,7 @@ from datetime import datetime
 
 from fastapi import Depends
 from loguru import logger
-from sqlalchemy import exc, select, insert, func, bindparam, union, update
+from sqlalchemy import exc, select, func, bindparam, union, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.functions import count
 from sqlalchemy.types import String, Float, Integer, DateTime
@@ -98,7 +98,7 @@ class StockRecordDAO:
             await self.session.execute(insert_sql, [{'document_direction': document.direction,
                                                      'document_id': document.id}])
 
-            if document.validate_stock_availability:
+            if document.validate_stock_availability and document.direction < 0:
                 sql = select(func.count(StockRecordModel.stock_record_id)).where((StockRecordModel.change_source_id == document.id))
                 res = await self.session.execute(sql, [{}])
                 count = res.scalar_one()
@@ -141,11 +141,11 @@ class StockRecordDAO:
             return True
 
         except exc.IntegrityError as e:
+            await self.session.rollback()
             if "asyncpg.exceptions.UniqueViolationError" not in e.args[0] \
                     or "product_id__change_source_id_uniqe" not in e.args[0]:
                 return False
             logger.warning('Duplicate document skipped: {}', e)
-            await self.session.rollback()
             return True
         except Exception:
             raise

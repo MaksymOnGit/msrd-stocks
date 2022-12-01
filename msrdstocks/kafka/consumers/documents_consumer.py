@@ -1,5 +1,8 @@
+import asyncio
+
 from confluent_kafka import DeserializingConsumer
 from pydantic import BaseModel
+from loguru import logger
 
 from msrdstocks.db.dao.stock_record_dao import StockRecordDAO
 from msrdstocks.db.models.document_status import DocumentStatus
@@ -17,7 +20,7 @@ async def documents_consumer():
         des_cons: DeserializingConsumer = consumer
         des_cons.subscribe(["MsrdDocuments.documents"])
         while True:
-            msg = des_cons.poll(timeout=1)
+            msg = des_cons.poll(timeout=0.3)
             if msg is None:
                 continue
 
@@ -45,4 +48,15 @@ async def process_document(doc: Document) -> bool:
             await StockRecordDAO(session).set_document_status_record(doc.id, DocumentStatus.DUPLICATE_ITEMS)
             return False
 
-        return await StockRecordDAO(session).create_incoming_stock_record(doc)
+        result = await StockRecordDAO(session).create_incoming_stock_record(doc)
+        retry_counter = 0
+        while not result and retry_counter < 5:
+            await asyncio.sleep(0.3)
+            logger.warning('Retrying document: {} Retry count: {}', doc.id, retry_counter)
+            result = await StockRecordDAO(session).create_incoming_stock_record(doc)
+            retry_counter = retry_counter + 1
+
+        if not result:
+            await StockRecordDAO(session).set_document_status_record(doc.id, DocumentStatus.REJECTED)
+
+        return result
