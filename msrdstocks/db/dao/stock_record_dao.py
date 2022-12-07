@@ -98,23 +98,22 @@ class StockRecordDAO:
             await self.session.execute(insert_sql, [{'document_direction': document.direction,
                                                      'document_id': document.id}])
 
+            sql = select(func.count(StockRecordModel.stock_record_id)).where((StockRecordModel.change_source_id == document.id))
+            res = await self.session.execute(sql, [{}])
+            count = res.scalar_one()
+            if count < len(document.items):
+                await self.session.rollback()
+                await self.session.execute(
+                    insert(DocumentStatusRecordModel).values(
+                        document_id=document.id,
+                        status=DocumentStatus.UNKNOWN_ITEMS,
+                        created=func.now(),
+                        updated=func.now()))
+                await self.session.commit()
+                return True
+
+
             if document.validate_stock_availability and document.direction < 0:
-                sql = select(func.count(StockRecordModel.stock_record_id)).where((StockRecordModel.change_source_id == document.id))
-                res = await self.session.execute(sql, [{}])
-                count = res.scalar_one()
-                if count < len(document.items):
-                    await self.session.rollback()
-                    await self.session.execute(
-                        insert(DocumentStatusRecordModel).values(
-                            document_id=document.id,
-                            status=DocumentStatus.UNKNOWN_ITEMS,
-                            created=func.now(),
-                            updated=func.now()))
-                    await self.session.commit()
-                    return True
-
-
-            if document.validate_stock_availability:
                 sql = select(func.count(StockRecordModel.stock_record_id)).where((StockRecordModel.change_source_id == document.id) & (StockRecordModel.quantity_actual < 0))
                 res = await self.session.execute(sql, [{}])
                 count = res.scalar_one()
